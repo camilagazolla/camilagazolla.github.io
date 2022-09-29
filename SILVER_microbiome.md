@@ -4,6 +4,9 @@ title: SILVER microbiome analysis
 
 # Evaluating quality
 
+To inspect read quality profiles we are going to use [FastQC](https://github.com/s-andrews/FastQC) to generate log files which are going to be passed to [MultiQC](https://github.com/ewels/MultiQC). The final report generated will containg summarising  statistics for all samples.
+
+
 On Shell:
 ```
 cd /gs/gsfs0/users/cgazollavo/SILVER/16S/2G00093/ # folder with fastq files
