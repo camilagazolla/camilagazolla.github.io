@@ -23,7 +23,7 @@ mv multiqc_data/ reverse_qc/
 ADD IMAGE HERE
 
 
-# ASV picking and taxonomic classification
+# ASV picking with DADA2 
 
 We start with the paired-end fastq files that have been demultiplexed and with barcodes/adapters removed. 
 
@@ -158,10 +158,46 @@ seqtab.nochim <- removeBimeraDenovo(seqtab, verbose=T, minFoldParentOverAbundanc
 # save environment  
 save.image(file='env_3.RData')
 ```
+\
+
+## Taxonomic classification
+
+In SILVER, more than one sequence table was generated. Here we are going to merge them, as well as the track files.
+
+On a fresh R session:
+
+```{r}
+# MERGE SEQUENCE TABLES AND TRACK IF MORE THAN 1 RUN
+
+# track1 <- readRDS("path/to/run1/output/track_i.rds")
+# track2 <- readRDS("path/to/run2/output/track_i.rds")
+# track_ii <- rbind(track1, track2)
+
+# seqtab.nochim1 <- readRDS("path/to/run1/output/seqtab.nochim1.rds")
+# seqtab.nochim2 <- readRDS("path/to/run2/output/seqtab.nochim2.rds")
+# seqtab.nochim <- mergeSequenceTables(seqtab.nochim1, seqtab.nochim2)
 
 
+dna <- DNAStringSet(getSequences(seqtab)) # Create a DNAStringSet from the ASVs
+load("/gs/gsfs0/users/cgazollavo/GTDB_r207-mod_April2022.RData")
+ids <- IdTaxa(dna, trainingSet, strand="both", processors=NULL, verbose=TRUE) # use all processors
+ranks <- c("domain", "phylum", "class", "order", "family", "genus", "species") # ranks of interest
 
+taxid <- t(sapply(ids, function(x) {
+  m <- match(ranks, x$rank)
+  taxa <- x$taxon[m]
+  taxa[startsWith(taxa, "unclassified_")] <- NA
+  taxa
+}))
+colnames(taxid) <- ranks; rownames(taxid) <- getSequences(seqtab)
 
+# save raw physeq
+physeq_IDTAXA_GTDB<- phyloseq(otu_table(seqtab.nochim, taxa_are_rows=FALSE), tax_table(taxid))
+saveRDS(physeq_IDTAXA_GTDB, paste0("raw_physeq_IDTAXA_GTDB_", Sys.Date(),".rds"))
+save.image(file='env_4.RData')
+
+################################
+```
 
 
 
