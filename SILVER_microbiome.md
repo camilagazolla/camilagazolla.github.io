@@ -29,7 +29,60 @@ multiqc forward_qc/ -o forward_qc/
 multiqc reverse_qc/ -o reverse_qc/
 ```
 
-ADD IMAGE HERE
+Check the multiqc_report.html on each folder.
+
+On R you can also use the plotQC function bellow to cancatenate the data of multiple sequence runs:
+```
+# load function to plot QC data from multiQC
+plotQC <- function(multiqc_dfs=list()){
+  require("ggplot2")
+  require("reshape2")
+  
+  for (df_name in names(multiqc_dfs)){
+    df <- multiqc_dfs[[df_name]]
+    df <- df[c(-1)]
+    meandf <- mean(as.matrix(df))
+    sddf <- sd(as.matrix(df))
+    cat(df_name, "present mean of:", meandf, "and sd of:", sddf, "\n") 
+  }
+  
+  df_plotFinal<- data.frame()
+  for (df_name in names(multiqc_dfs)){
+    df <- multiqc_dfs[[df_name]]
+    df <- df[c(-1)]
+    dfmean <- mean(as.matrix(df))
+    dfsd <- sd(as.matrix(df))
+    df_plot<- colMeans(df)
+    df_plot <- melt(df_plot)
+    df_plot$variable <- rownames(df_plot)
+    df_plot$variable <- gsub("^\\w", "",df_plot$variable)
+    df_plot$variable <- as.numeric(df_plot$variable)
+    df_plot$df_name <- df_name
+    df_plotFinal <- rbind(df_plotFinal,df_plot)
+  }
+  ggplot(data = df_plotFinal) + 
+    geom_line(mapping = aes(x = variable, y = value, color= df_name), size=1, alpha=0.8) +
+    theme_classic(12)+ scale_color_brewer(palette="Dark2", direction = 1) +
+    labs(y= "Mean quality score", x="Position in the read") +
+    theme(legend.title = element_blank(), legend.position = "bottom")+
+    scale_y_continuous(limits = c(0, 41))+
+    guides(color=guide_legend(ncol=2))
+}
+
+# read files for each sequence run and each read orientation
+2G00089_F <- read.table("/gs/gsfs0/users/cgazollavo/SILVER/16S/2G00089/reverse_qc/multiqc_data/mqc_fastqc_per_base_sequence_quality_plot_1.txt", header = T)
+2G00089_R <- read.table("/gs/gsfs0/users/cgazollavo/SILVER/16S/2G00089/reverse_qc/multiqc_data/mqc_fastqc_per_base_sequence_quality_plot_1.txt", header = T)
+2G00093_F <- read.table("/gs/gsfs0/users/cgazollavo/SILVER/16S/2G00089/reverse_qc/multiqc_data/mqc_fastqc_per_base_sequence_quality_plot_1.txt", header = T)
+2G00093_R <- read.table("/gs/gsfs0/users/cgazollavo/SILVER/16S/2G00089/reverse_qc/multiqc_data/mqc_fastqc_per_base_sequence_quality_plot_1.txt", header = T)
+
+multiqc_dfs= list("2G0089_16S"=QC89,"2G0093_16S"=QC93)
+
+# run function to plot and then save it as a svg image
+svg("quality_scores.svg", width=3.54331, height=3.54331)
+plotQC(multiqc_dfs)
+dev.off()
+
+```
 
 
 # ASV picking with DADA2 
