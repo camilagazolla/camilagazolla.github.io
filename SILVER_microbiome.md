@@ -2,26 +2,31 @@
 title: SILVER microbiome analysis
 ---
 
+# Input files
+
+We start our journey with the paired-end fastq files that have been demultiplexed and with barcodes/adapters removed. 
+
+
 # Evaluating quality
+
 
 To inspect read quality profiles for each SILVER run we are going to use [FastQC](https://github.com/s-andrews/FastQC) to generate log files which are going to be passed to [MultiQC](https://github.com/ewels/MultiQC). A final report will be generated will containg summarising  statistics for all samples.
 
 
 On Shell:
 ```
-conda activate biobase # activate the conda enviroment with the tools
-cd /gs/gsfs0/users/cgazollavo/SILVER/16S/2G00093/ # folder with fastq files
+ # activate the conda enviroment with the tools
+conda activate biobase
+
+# cd to the folder with fastq files
+cd /gs/gsfs0/users/cgazollavo/SILVER/16S/2G00093/ 
+
+mkdir forward_qc reverse_qc
 fastqc *fastq -t 30
-mkdir forward_qc
 mv *_R1_fastqc* forward_qc
-mkdir reverse_qc
 mv *_R2_fastqc* reverse_qc
-multiqc forward_qc/
-mv multiqc_report.html forward_qc/
-mv multiqc_data/ forward_qc/
-multiqc reverse_qc/
-mv multiqc_report.html reverse_qc/
-mv multiqc_data/ reverse_qc/
+multiqc forward_qc/ -o forward_qc/
+multiqc reverse_qc/ -o reverse_qc/
 ```
 
 ADD IMAGE HERE
@@ -29,7 +34,6 @@ ADD IMAGE HERE
 
 # ASV picking with DADA2 
 
-We start with the paired-end fastq files that have been demultiplexed and with barcodes/adapters removed. 
 
 Considering that every amplicon dataset has a different set of error rates, each one of the two SILVER sequecing runs (2G0089 and 2G0093) will be analysized separately until the classification step.
 
