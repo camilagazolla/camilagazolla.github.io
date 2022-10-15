@@ -45,8 +45,8 @@ cd /gs/gsfs0/users/cgazollavo/SILVER/raw_data/2G0089/16S/LibA/ # folder with the
 
 # you need to give the full path to the fastq files
 sh 2_demultiplex_HPC_ol_skipper_SL.sh \
--f /gs/gsfs0/users/cgazollavo/SILVER/raw_data/2G0089/16S/LibA/p9316SV4A_R1_001.fastq \
--r /gs/gsfs0/users/cgazollavo/SILVER/raw_data/2G0089/16S/LibA/p9316SV4A_R2_001.fastq \
+-f /gs/gsfs0/users/cgazollavo/SILVER/raw_data/2G0089/16S/LibA/p8916SV4A_R1_001.fastq \
+-r /gs/gsfs0/users/cgazollavo/SILVER/raw_data/2G0089/16S/LibA/p8916SV4A_R2_001.fastq \
 -m map_2G0089_16S_LibA.txt 
 ```
 
