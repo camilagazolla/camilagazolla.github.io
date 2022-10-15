@@ -25,7 +25,7 @@ gunzip *.fastq.gz
 ```
 
 #### Use the 1_map.sh script to create files
-Use [1_map.sh] (https://github.com/camilagazolla/camilagazolla.github.io/blob/main/1_map.sh), but ATTENTION using it with different libraries because the same filenames will be created.
+Use [1_map.sh](https://github.com/camilagazolla/camilagazolla.github.io/blob/main/1_map.sh), but ATTENTION using it with different libraries because the same filenames will be created.
 
 ```
 sh 1_map.sh -m map_2G0089_16S_LibA.txt
