@@ -148,67 +148,10 @@ multiqc reverse_qc/ -o reverse_qc/
 
 Check the multiqc_report.html on each folder.
 
-On R you can also use the plotQC function bellow to cancatenate the data of multiple sequence runs:
-```
-# load function to plot QC data from multiQC
-plotQC <- function(multiqc_dfs=list()){
-  require("ggplot2")
-  require("reshape2")
-  
-  for (df_name in names(multiqc_dfs)){
-    df <- multiqc_dfs[[df_name]]
-    df <- df[c(-1)]
-    meandf <- mean(as.matrix(df))
-    sddf <- sd(as.matrix(df))
-    cat(df_name, "present mean of:", meandf, "and sd of:", sddf, "\n") 
-  }
-  
-  df_plotFinal<- data.frame()
-  for (df_name in names(multiqc_dfs)){
-    df <- multiqc_dfs[[df_name]]
-    df <- df[c(-1)]
-    dfmean <- mean(as.matrix(df))
-    dfsd <- sd(as.matrix(df))
-    df_plot<- colMeans(df)
-    df_plot <- melt(df_plot)
-    df_plot$variable <- rownames(df_plot)
-    df_plot$variable <- gsub("^\\w", "",df_plot$variable)
-    df_plot$variable <- as.numeric(df_plot$variable)
-    df_plot$df_name <- df_name
-    df_plotFinal <- rbind(df_plotFinal,df_plot)
-  }
-  ggplot(data = df_plotFinal) + 
-    geom_line(mapping = aes(x = variable, y = value, color= df_name), size=1, alpha=0.8) +
-    theme_classic(12)+ scale_color_brewer(palette="Dark2", direction = 1) +
-    labs(y= "Mean quality score", x="Position in the read") +
-    theme(legend.title = element_blank(), legend.position = "bottom")+
-    scale_y_continuous(limits = c(0, 41))+
-    guides(color=guide_legend(ncol=2))
-}
-
-# read files for each sequence run and each read orientation
-2G00089_F <- read.table("/gs/gsfs0/users/cgazollavo/SILVER/16S/2G00089/reverse_qc/multiqc_data/mqc_fastqc_per_base_sequence_quality_plot_1.txt", header = T)
-2G00089_R <- read.table("/gs/gsfs0/users/cgazollavo/SILVER/16S/2G00089/reverse_qc/multiqc_data/mqc_fastqc_per_base_sequence_quality_plot_1.txt", header = T)
-2G00093_F <- read.table("/gs/gsfs0/users/cgazollavo/SILVER/16S/2G00089/reverse_qc/multiqc_data/mqc_fastqc_per_base_sequence_quality_plot_1.txt", header = T)
-2G00093_R <- read.table("/gs/gsfs0/users/cgazollavo/SILVER/16S/2G00089/reverse_qc/multiqc_data/mqc_fastqc_per_base_sequence_quality_plot_1.txt", header = T)
-
-multiqc_dfs= list("2G0089_16S"=QC89,"2G0093_16S"=QC93)
-
-# run function to plot and then save it as a svg image
-svg("quality_scores.svg", width=3.54331, height=3.54331)
-plotQC(multiqc_dfs)
-dev.off()
-
-```
-
-
 # ASV picking with DADA2 
-
-
 Considering that every amplicon dataset has a different set of error rates, each one of the two SILVER sequecing runs (2G0089 and 2G0093) will be analysized separately until the classification step.
 
 On R:
-
 ```{r}
 # load packages
 library("dada2")
@@ -262,14 +205,11 @@ sample_namesR <- gsub("(.*)_R2\\.fastq","\\1",basename(filtRs))
 # save environment  
 save.image(file='env_1.RData')
 ```
-\
-\
 🛑 STOP: make sure that the samples names are right by checking a few of them:
 ```{r}
 sample_names[1:10]
 sample_namesR [1:10]
 ```
-\
 If yes, continue the pipeline:
 ```{r}
 # test if we have paired end data
@@ -303,10 +243,7 @@ saveRDS(track_i, "track_i.rds")
 save.image(file='env_2.RData')
 }
 ```
-\
-\
 🛑 STOP: test if the reads should be concatenated or merged. First, try to merge the reads:
-
 ```{r}
 # merge denoised reads 
 mergers <- mergePairs(dadaFs, derepFs, dadaRs, derepRs)
@@ -314,67 +251,48 @@ mergers <- mergePairs(dadaFs, derepFs, dadaRs, derepRs)
 # check if reads were merged
 cbind(filterAndTrim_res, sapply(dadaFs, getN), sapply(dadaRs, getN), sapply(mergers, getN))
 ```
-\
 If most of the reads were not merged (**this is the case of SILVER!**), concatenate them:
 ```{r}
 # concatenate denoised reads 
 mergers <- mergePairs(dadaFs, derepFs, dadaRs, derepRs, justConcatenate=TRUE)
 ```
-\
 And continue the pipeline:
 ```{r}
 # make the sequence table as save its raw version
 seqtab <- makeSequenceTable(mergers)
 saveRDS(seqtab, "seqtab_raw.RDS")
 
-# drop reads present in just one sample
-seqtab <- seqtab[, colSums(seqtab) > 1]
+# drop reads present in less than 2 samples
+seqtab <- seqtab[, colSums(seqtab) > 2]
+write(dim(seqtab), "seqtab_drop_only_one_sample_dim.txt")
 
-# remove chimeras
-seqtab.nochim <- removeBimeraDenovo(seqtab, verbose=T, minFoldParentOverAbundance = 4)
+#check  
+head(table(colSums(seqtab)))
 
-# save environment  
-save.image(file='env_3.RData')
+saveRDS(seqtab, "seqtab_filt.RDS")
 ```
-\
 
-## Taxonomic classification
-
+#### Taxonomic classification
 In SILVER, more than one sequence table was generated. Here we are going to merge them, as well as the track files.
 
 On a fresh R session:
-
 ```{r}
 # MERGE SEQUENCE TABLES AND TRACK IF MORE THAN 1 RUN
+track1 <- readRDS("track_i_2G00089.rds")
+track2 <- readRDS("track_i_2G00093.rds")
+track <- rbind(track1, track2)
 
-# track1 <- readRDS("path/to/run1/output/track_i.rds")
-# track2 <- readRDS("path/to/run2/output/track_i.rds")
-# track_ii <- rbind(track1, track2)
+seqtab1 <- readRDS("seqtab_filt_2G00089.RDS")
+seqtab2 <- readRDS("seqtab_filt_2G00093.RDS")
+seqtab <- mergeSequenceTables(seqtab1, seqtab2)
 
-# seqtab.nochim1 <- readRDS("path/to/run1/output/seqtab.nochim1.rds")
-# seqtab.nochim2 <- readRDS("path/to/run2/output/seqtab.nochim2.rds")
-# seqtab.nochim <- mergeSequenceTables(seqtab.nochim1, seqtab.nochim2)
-
-
-dna <- DNAStringSet(getSequences(seqtab)) # Create a DNAStringSet from the ASVs
-load("/gs/gsfs0/users/cgazollavo/GTDB_r207-mod_April2022.RData")
-ids <- IdTaxa(dna, trainingSet, strand="both", processors=NULL, verbose=TRUE) # use all processors
-ranks <- c("domain", "phylum", "class", "order", "family", "genus", "species") # ranks of interest
-
-taxid <- t(sapply(ids, function(x) {
-  m <- match(ranks, x$rank)
-  taxa <- x$taxon[m]
-  taxa[startsWith(taxa, "unclassified_")] <- NA
-  taxa
-}))
-colnames(taxid) <- ranks; rownames(taxid) <- getSequences(seqtab)
+# Assign taxonomy
+tax <- assignTaxonomy(seqtab, "/gs/gsfs0/users/burk-lab/DB/DADA2/silva_nr_v138_train_set.fa.gz", multithread=TRUE, verbose = TRUE)
 
 # save raw physeq
-physeq_IDTAXA_GTDB<- phyloseq(otu_table(seqtab.nochim, taxa_are_rows=FALSE), tax_table(taxid))
-saveRDS(physeq_IDTAXA_GTDB, paste0("raw_physeq_IDTAXA_GTDB_", Sys.Date(),".rds"))
-save.image(file='env_4.RData')
-
-################################
+physeq <- phyloseq(otu_table(seqtab, taxa_are_rows=FALSE), tax_table(tax))
+saveRDS(physeq, paste0("raw_physeq_RDP_SILVA_", Sys.Date(),".rds"))
+save.image(file='env_3.RData')
 ```
 
 
