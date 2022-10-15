@@ -2,16 +2,133 @@
 title: SILVER microbiome analysis
 ---
 
-# Input files
+# Demultiplexing steps
 
-We start our journey with the paired-end fastq files that have been demultiplexed and with barcodes/adapters removed. 
+We start our journey with multiplexed FASTQ files. 
 
+#### Create mapping file 
+We need to create a .txt with connection of samples to barcodes such as [map_2G0089_16S_LibA.txt](https://github.com/camilagazolla/camilagazolla.github.io/blob/main/map_2G0089_16S_LibA.txt). You need to use a file like [2G0089_PCR Profile.xlsx](https://github.com/camilagazolla/camilagazolla.github.io/blob/main/2G0089_PCR%20Profile.xlsx) that is supposed to be at the Dropbox in a folder such as Personal/Next_Generation_Sequencing_Assays/Run/Library. The mapping file needs Linux line breaks. On Notepad++ you can go to edit --> EOL Conversion --> choose LINUX. You can make sure that $ appear at the end with:
+
+```
+cat -e map_2G0089_16S_LibA.txt
+```
+
+#### Ask for resources on the cluster
+```
+srun --partition=large-mem --nodes=1 --ntasks=1 --cpus-per-task=1 --mem-per-cpu 800G -t 00-24:00:00 --pty bash
+```
+
+#### Place the ITS and 16S library files in separated folders, DO IT FOR EACH LIBRARY TOO!
+```
+cd [.fastq.gz] # library folder with ITS **OR** 16S 
+gunzip *.fastq.gz
+```
+
+#### Use the 1_map.sh script to create files
+Use [1_map.sh] (https://github.com/camilagazolla/camilagazolla.github.io/blob/main/1_map.sh), but ATTENTION using it with different libraries because the same filenames will be created.
+
+```
+sh 1_map.sh -m map_2G0089_16S_LibA.txt
+```
+The outputs should be: 1_1_1_plate_barcodes.txt, 1_1_3_forward.txt, general_barcode_p1.txt, and general_barcode_p2.txt.
+
+#### Use the 2_demultiplex_HPC_ol_skipper_SL.sh script
+To use [2_demultiplex_HPC_ol_skipper_SL.sh](https://github.com/camilagazolla/camilagazolla.github.io/blob/main/2_demultiplex_HPC_ol_skipper_SL.sh) you should have in the same folder the 4 outputs from 1_map.sh, 2_demultiplex_HPC_ol_skipper_SL.sh and map_2G0089_16S_LibA.txt.
+I recommend to run it with an open screen session:
+
+```
+screen -S 2G0089_16S_LibA
+
+srun --partition=large-mem --nodes=1 --ntasks=1 --cpus-per-task=1 --mem-per-cpu 200G -t 00-24:00:00 --pty bash
+
+cd /gs/gsfs0/users/cgazollavo/SILVER/raw_data/2G0089/16S/LibA/ # folder with the files
+
+# you need to give the full path to the fastq files
+sh 2_demultiplex_HPC_ol_skipper_SL.sh \
+-f /gs/gsfs0/users/cgazollavo/SILVER/raw_data/2G0089/16S/LibA/p9316SV4A_R1_001.fastq \
+-r /gs/gsfs0/users/cgazollavo/SILVER/raw_data/2G0089/16S/LibA/p9316SV4A_R2_001.fastq \
+-m map_2G0089_16S_LibA.txt 
+```
+
+#### Move and rename the samples with the library and run name
+```
+# cd to the samples folder
+cd /gs/gsfs0/users/cgazollavo/SILVER/raw_data/2G0089/16S/LibA/samples
+
+mkdir samples_fastq
+mv */*.fastq samples_fastq/
+ls -l . | grep -c ^d # count the number of directory (samples+1)
+cd samples_fastq 
+ls | wc -l # count the number of files
+
+# CHANGE HERE!!!
+for FILENAME in *; do mv $FILENAME 2G0089_16S_LibA_$FILENAME; done # rename files
+
+cd ..
+ls . | grep -v "samples_fastq" | xargs rm -r
+mv samples_fastq/*.fastq .
+rm samples_fastq -r
+```
+
+#### Evaluate if the demultiplexing worked
+IMPORTANT: Demultiplexing could go wrong! You need to make sure that no sample was left behind. Go to the folder with the samples and ls the files:
+```
+cd /gs/gsfs0/users/cgazollavo/SILVER/raw_data/2G0089/16S/LibA/samples
+
+# CHANGE HERE!!!
+ls *R1.fastq > 2G0089_16S_LibA_samples.txt
+```
+
+You can put all the files produced in multiple runs in a folder to create something like [2G0089_16S_files_dem.txt](https://github.com/camilagazolla/camilagazolla.github.io/blob/main/2G0089_16S_files_dem.txt)
+```
+cat 2G0089_16S_Lib* > 2G0089_16S_files_dem.txt
+```
+
+Now use R to check if all samples were processed:
+
+```
+setwd("/Users/camila/Desktop/SILVER/microbiome_data/demultiplexing")
+library(dplyr)
+
+# read the data
+files16s <- read.table("2G0089_16S_files_dem.txt", header = F)
+head(files16s)
+
+# separate the colum
+files16s$V1 <- gsub("_R..fastq","",files16s$V1)
+files16s <- separate(files16s, V1, c("Amp","Run","RunLib","BurkID"), sep="\\.", remove = FALSE)
+
+# remove duplicates
+files16s <- files16s[!duplicated(files16s$V1),]
+
+View(files16s)
+table(files16s$Run)
+table(files16s$RunLib)
+
+# read the map files
+libA_89 <- read.delim("map_2G0089_16S_LibA.txt", header = T)
+libB_89 <- read.delim("map_2G0089_16S_LibB.txt", header = T)
+
+libA_93 <- read.delim("map_2G0093_16S_LibA.txt", header = T)
+libB_93 <- read.delim("map_2G0093_16S_LibB.txt", header = T)
+
+# see the differences
+length(libA_89$Lab.ID)
+dim(files16s %>% filter(Run=="2G0089" & RunLib=="libA"))[1] # SIZES OK
+
+length(libB_89$Lab.ID)
+dim(files16s %>% filter(Run=="2G0089" & RunLib=="libB"))[1] # SIZES OK
+
+length(libA_93$Lab.ID) # DEU RUIM
+dim(files16s %>% filter(Run=="2G0093" & RunLib=="libA"))[1] # SIZES OK
+
+length(libB_93$Lab.ID)
+dim(files16s %>% filter(Run=="2G0093" & RunLib=="libB"))[1] # SIZES OK
+```
 
 # Evaluating quality
 
-
-To inspect read quality profiles for each SILVER run we are going to use [FastQC](https://github.com/s-andrews/FastQC) to generate log files which are going to be passed to [MultiQC](https://github.com/ewels/MultiQC). A final report will be generated will containg summarising  statistics for all samples.
-
+We start with the paired-end fastq files that have been demultiplexed. To inspect read quality profiles for each SILVER run we are going to use [FastQC](https://github.com/s-andrews/FastQC) to generate log files which are going to be passed to [MultiQC](https://github.com/ewels/MultiQC). A final report will be generated will containg summarising  statistics for all samples.
 
 On Shell:
 ```
