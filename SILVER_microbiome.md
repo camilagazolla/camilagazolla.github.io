@@ -286,7 +286,7 @@ saveRDS(track, "track_all.rds")
 seqtab1 <- readRDS("seqtab_filt_2G00089.RDS")
 seqtab2 <- readRDS("seqtab_filt_2G00093.RDS")
 seqtab <- mergeSequenceTables(seqtab1, seqtab2)
-saveRDS(seqtab, "seqtab_filt_all.rds")
+saveRDS(seqtab, "seqtab_all.rds")
 
 # assign taxonomy
 tax <- assignTaxonomy(seqtab, "/gs/gsfs0/users/burk-lab/DB/DADA2/silva_nr_v138_train_set.fa.gz", multithread=TRUE, verbose = TRUE)
