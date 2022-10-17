@@ -277,35 +277,66 @@ In SILVER, more than one sequence table was generated. Here we are going to merg
 
 On a fresh R session:
 ```{r}
-# MERGE SEQUENCE TABLES AND TRACK IF MORE THAN 1 RUN
+# merge data
 track1 <- readRDS("track_i_2G00089.rds")
 track2 <- readRDS("track_i_2G00093.rds")
 track <- rbind(track1, track2)
+saveRDS(track, "track_all.rds")
 
 seqtab1 <- readRDS("seqtab_filt_2G00089.RDS")
 seqtab2 <- readRDS("seqtab_filt_2G00093.RDS")
 seqtab <- mergeSequenceTables(seqtab1, seqtab2)
+saveRDS(seqtab, "seqtab_filt_all.rds")
 
-# Assign taxonomy
+# assign taxonomy
 tax <- assignTaxonomy(seqtab, "/gs/gsfs0/users/burk-lab/DB/DADA2/silva_nr_v138_train_set.fa.gz", multithread=TRUE, verbose = TRUE)
+saveRDS(tax, "tax.rds")
 
-# save raw physeq
-physeq <- phyloseq(otu_table(seqtab, taxa_are_rows=FALSE), tax_table(tax))
-saveRDS(physeq, paste0("raw_physeq_RDP_SILVA_", Sys.Date(),".rds"))
+# create physeq object and save it
+physeq_raw <- phyloseq(otu_table(seqtab, taxa_are_rows=FALSE), tax_table(tax))
+saveRDS(tax, "physeq_raw.rds")
+
 save.image(file='env_3.RData')
 ```
+ 
+ #### Filter the phyloseq object 
+```
+# load phyloseq
+library(phyloseq)
+physeq_raw <- readRDS("physeq_raw.rds")
 
+# mantain only Bacteria Kingdom
+table(tax_table(physeq_raw)[,"Kingdom"],useNA="always")
+physeq_filt <-  phyloseq::subset_taxa(physeq_raw, Kingdom =="Bacteria")
 
+# remove phylum of NA
+table(tax_table(physeq_filt)[,"Phylum"],useNA="always")
+physeq_filt <- subset_taxa(physeq_filt, Phylum != "NA")
 
+# agglomerate to genus
+physeq_filt <- tax_glom(physeq_filt, "Genus")
 
-## Requirements 
+# replace NA with the last taxa assigned
+library(zoo)
+tax_tab <- tax_table(physeq_filt)
+tax_tab <- na.locf(t(tax_tab), na.rm = FALSE)
+tax_table(physeq_filt) <- t(tax_tab)
 
-**NOTE:** This analysis requires at least 10GB of RAM to run.
-It uses large files not included in the repository and many steps can take a few minutes to run. 
+# filter phyoseq SILVER samples (not controls!) with less than 10K reads
+lib_cut = 10000
+sample_filt = sample_sums(physeq_raw)>=lib_cut
 
-## Parameters
+# if contains "NC, PC or SNEG" in the sample name add FALSE to sample_filt vector
+for (i in 1:length(sample_filt)){
+    if (grepl("PC|NC|SNEG", names(sample_filt[i]))){
+        sample_filt[i] = TRUE
+        } 
+}
 
-### Analysis input/output
+# filter phyloseq object
+physeq_filt <- prune_samples(sample_filt, physeq_filt)
 
-```{r }
+# remove taxa with all zeroes
+physeq_filt <- prune_taxa(taxa_sums(physeq_filt) != 0, physeq_filt) 
+    
 ```
