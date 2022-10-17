@@ -299,7 +299,8 @@ saveRDS(tax, "physeq_raw.rds")
 save.image(file='env_3.RData')
 ```
  
- #### Filter the phyloseq object 
+#### Filter the phyloseq object 
+ 
 ```
 # load phyloseq
 library(phyloseq)
@@ -338,5 +339,7 @@ physeq_filt <- prune_samples(sample_filt, physeq_filt)
 
 # remove taxa with all zeroes
 physeq_filt <- prune_taxa(taxa_sums(physeq_filt) != 0, physeq_filt) 
-    
+
+# save phyloseq object
+saveRDS(physeq_filt, file = "physeq_filt.rds")
 ```
