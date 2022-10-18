@@ -119,7 +119,7 @@ dim(files16s %>% filter(Run=="2G0089" & RunLib=="libA"))[1] # SIZES OK
 length(libB_89$Lab.ID)
 dim(files16s %>% filter(Run=="2G0089" & RunLib=="libB"))[1] # SIZES OK
 
-length(libA_93$Lab.ID) # DEU RUIM
+length(libA_93$Lab.ID)
 dim(files16s %>% filter(Run=="2G0093" & RunLib=="libA"))[1] # SIZES OK
 
 length(libB_93$Lab.ID)
